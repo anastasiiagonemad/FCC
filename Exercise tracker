@@ -1,0 +1,108 @@
+const express = require('express')
+const bodyParser = require('body-parser');
+const app = express()
+const cors = require('cors')
+require('dotenv').config()
+const { v4: uuidv4 } = require('uuid');
+
+app.use(cors())
+app.use(express.static('public'))
+app.get('/', (req, res) => {
+  res.sendFile(__dirname + '/views/index.html')
+});
+app.use(bodyParser.urlencoded({ extended: true}))
+app.use(express.json())
+
+const users = [];
+const exercises = [];
+
+app.post('/api/users', (req, res) => {
+
+  const username = req.body.username;
+  if(!username) {
+    return res.status(400).json({ error: 'Username is required'})
+  }
+  const id = uuidv4().split('-').join('')
+  const newUser = {
+    username,
+    _id: id
+  }
+  users.push(newUser)
+  res.json(newUser)
+})
+
+app.get('/api/users', (req, res) => {
+  res.json(users)
+})
+
+app.post('/api/users/:_id/exercises', (req, res) => {
+
+  const userId = req.params._id
+  const {description, duration, date} = req.body
+
+  const user = users.find((u) => u._id === userId);
+  if(!user) {
+    return res.status(404).json({ error: 'User not found'})
+  }
+
+  const exerciseDate = date ? new Date(date).toDateString() : new Date().toDateString();
+
+  const newExercise = {
+    description, 
+    duration: parseInt(duration),
+    date: exerciseDate,
+  }
+
+  if(!user.exercises) user.exercises = []
+  user.exercises.push(newExercise);
+
+  res.json({
+    username: user.username,
+    description: newExercise.description,
+    duration: newExercise.duration,
+    date: newExercise.date,
+    _id: user._id
+  })
+})
+
+app.get('/api/users/:id/logs', (req, res) => {
+  const { id } = req.params;
+  const { from, to, limit } = req.query;
+
+  const user = users.find((u) => u._id === id);
+  if (!user) {
+    return res.status(404).json({ error: 'User not found' });
+  }
+
+  let logs = user.exercises || [];
+
+  if (from) {
+    const fromDate = new Date(from);
+    logs = logs.filter((log) => new Date(log.date) >= fromDate);
+  }
+  if (to) {
+    const toDate = new Date(to);
+    logs = logs.filter((log) => new Date(log.date) <= toDate);
+  }
+
+  if (limit) {
+    logs = logs.slice(0, Number(limit));
+  }
+
+  const userLog = {
+    username: user.username,
+    count: logs.length,
+    _id: user._id,
+    log: logs.map((log) => ({
+      description: log.description,
+      duration: log.duration,
+      date: log.date,
+    })),
+  };
+
+  res.json(userLog);
+});
+
+const listener = app.listen(process.env.PORT || 3000, () => {
+  console.log('Your app is listening on port ' + listener.address().port)
+})
