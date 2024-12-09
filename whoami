@@ -1,0 +1,3 @@
+app.get('/api/whoami', function (req, res) {
+  res.json({ ipaddress: req.ip, language: req.acceptsLanguages(), software: req.get('User-Agent') });
+});
